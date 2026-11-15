@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meetings · AI Forward Network demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23E8813A%22/%3E%3Ctext x=%2216%22 y=%2221%22 font-size=%2213%22 font-family=%22Arial%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script src="data.js"></script>
+<script src="app.js"></script>
+<style>
+.mtg{display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:760px){.mtg{grid-template-columns:150px 1fr 220px}}
+.mtg .d{font-family:var(--f-head);font-weight:700;color:var(--orange-dk);font-size:1.15rem}
+.mtg .past{color:var(--muted)}
+.list{display:grid;gap:12px}
+.checkin{display:flex;gap:8px;flex-wrap:nowrap}
+.checkin input{text-transform:uppercase}
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">'26-27 meeting series</p>
+  <h1 class="page">Meetings</h1>
+  <p class="lede">Everyone sees the dates and topics. Times, rooms, and calendar invites unlock once staff approve you. Approved guests unlock only the one meeting they asked for.</p>
+  <div id="status" style="margin-bottom:18px"></div>
+  <div class="row" style="margin-bottom:18px" id="allwrap"></div>
+  <div class="list" id="list"></div>
+</main>
+<script>
+APP.shell();
+const D = DEMO, { $, esc, isMember, role, ics, download, store, toast } = APP;
+const r = role(), member = isMember();
+const ledger = () => store.get('ledger', D.LEDGER_SEED);
+$('#status').innerHTML = member
+  ? `<div class="note s"><b>You're an approved member.</b> Times and rooms are visible. In ${D.THIS_MONTH_LABEL}, check in with the room code posted at the meeting (demo code: <code>${D.THIS_MONTH_CODE}</code>) to earn your ATTEND XP.</div>`
+  : r === 'pending' ? `<div class="note o"><b>You're on the waitlist.</b> Dates and topics are here now. Times and rooms appear the moment staff approve you.</div>`
+  : `<div class="note"><b>Browsing as a visitor.</b> <a href="join.html">Join</a> to unlock times, rooms, and calendar invites. Or switch "View as" to Member.</div>`;
+if (member) {
+  $('#allwrap').innerHTML = `<button class="btn navy" id="all">Add them all to my calendar (.ics)</button><span class="tiny muted">One file, ${D.MEETINGS.length} events, Pacific time</span>`;
+  $('#all').addEventListener('click', () => { download('ai-forward-26-27.ics', ics(D.MEETINGS), 'text/calendar'); toast('Calendar file downloaded.'); });
+}
+function render(){
+  const L = ledger();
+  $('#list').innerHTML = D.MEETINGS.map(m => {
+    const month = m.id.slice(0,7), isNow = month === D.THIS_MONTH, done = L.includes(month + '_attend');
+    return `<article class="card mtg">
+      <div><div class="d">${esc(m.date)}</div>${isNow ? '<span class="pill o">This month</span>' : ''}</div>
+      <div><h2 style="font-size:1.2rem">${esc(m.topic)}</h2><p class="muted small">${esc(m.sub)}</p></div>
+      <div>${member ? `<p class="small"><b>${esc(m.time)}</b><br>${esc(m.room)}</p>
+          <button class="btn ghost sm" style="margin-top:8px" data-ics="${m.id}">Add to calendar</button>
+          ${isNow ? (done ? `<p class="pill s" style="margin-top:10px">✓ Checked in: +1 ATTEND</p>`
+            : `<form class="checkin" style="margin-top:10px" data-ci="${month}"><label class="sr" for="c-${m.id}">Room code</label><input id="c-${m.id}" type="text" placeholder="Room code" autocomplete="off"><button class="btn sm">Check in</button></form>`) : ''}`
+        : `<span class="lock">🔒 Time &amp; room for members</span>`}</div>
+    </article>`; }).join('');
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-ics]'); if (!b) return;
+  const m = D.MEETINGS.find(x => x.id === b.dataset.ics); download('ai-forward-' + m.id + '.ics', ics([m]), 'text/calendar'); toast('Invite downloaded.'); });
+document.addEventListener('submit', e => { const f = e.target.closest('[data-ci]'); if (!f) return; e.preventDefault();
+  const code = f.querySelector('input').value.trim().toUpperCase();
+  if (code !== D.THIS_MONTH_CODE) { toast('That code doesn\'t match this meeting.'); return; }
+  store.set('ledger', ledger().concat(f.dataset.ci + '_attend')); render(); toast('Checked in. +1 ATTEND this month.'); });
+render();
+</script>
+</body>
+</html>

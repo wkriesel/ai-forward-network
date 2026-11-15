@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How it works · AI Forward Network demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23E8813A%22/%3E%3Ctext x=%2216%22 y=%2221%22 font-size=%2213%22 font-family=%22Arial%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script src="data.js"></script>
+<script src="app.js"></script>
+<style>
+.arch{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}
+.arch .card{border-top:5px solid var(--c)}
+.arch .k{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--c)}
+.dec{display:grid;gap:12px}
+.dec .card{display:grid;grid-template-columns:40px 1fr;gap:14px}
+.dec .n{width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">Under the hood</p>
+  <h1 class="page">How it works</h1>
+  <p class="lede">One app, one repo, one Firebase project. A one-day summit app was extended, a module at a time, into a year-round network platform without rewriting or breaking any of it. The network is the umbrella, and the summit is one event inside it.</p>
+
+  <section aria-labelledby="h-a">
+    <h2 class="sec" id="h-a">Architecture: a modular monolith, no build step</h2>
+    <div class="arch" style="margin-top:14px">
+      <div class="card" style="--c:var(--navy)"><p class="k">Front end</p><h3>One app shell + ES modules</h3><p class="small muted">Native browser modules for auth, events, community, and the XP game. Static files on Firebase Hosting, installable as a PWA.</p></div>
+      <div class="card" style="--c:var(--orange-dk)"><p class="k">Identity</p><h3>Google sign-in or a magic link</h3><p class="small muted">Firebase Auth. The email's domain decides the track, which decides how fast a person gets reviewed.</p></div>
+      <div class="card" style="--c:var(--sage-dk)"><p class="k">Data</p><h3>Firestore + least-privilege rules</h3><p class="small muted">Members, meetings, domains, ledger, roles. The rules enforce every gate the pages display.</p></div>
+      <div class="card" style="--c:#7a4fa3"><p class="k">Messaging</p><h3>Transactional email</h3><p class="small muted">Confirmation, approval, and decision emails. Each one prefers the member's chosen contact address.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-r">
+    <h2 class="sec" id="h-r">The rules that carry the weight (trimmed, simplified)</h2>
+<pre class="code"><span class="c">// A member can edit their profile, but never their own status.
+// "pending" is the waitlist; only staff can flip it to "active".</span>
+<span class="k">match</span> /networkMembers/{uid} {
+  <span class="k">allow</span> create: <span class="k">if</span> request.auth.uid == uid
+    &amp;&amp; request.resource.data.status == <span class="s">'pending'</span>;
+  <span class="k">allow</span> update: <span class="k">if</span> isStaff()
+    || (request.auth.uid == uid
+        &amp;&amp; request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly([<span class="s">'bio'</span>, <span class="s">'contactEmail'</span>, <span class="s">'photo'</span>]));
+}
+
+<span class="c">// XP: one doc per member, per month, per vector. The ID is the rule.</span>
+<span class="k">match</span> /xpLedger/{id} {
+  <span class="k">allow</span> create: <span class="k">if</span> id == request.auth.uid + <span class="s">'_'</span> + thisMonth() + <span class="s">'_'</span> + request.resource.data.vector;
+  <span class="k">allow</span> update: <span class="k">if</span> <span class="s">false</span>;   <span class="c">// a second ATTEND this month can't land</span>
+}
+
+<span class="c">// Owners are hardcoded as a lockout safeguard: if the roles
+// collection is ever emptied, these accounts can still get back in.</span>
+<span class="k">function</span> isStaff() { <span class="k">return</span> isOwner() || hasRole([<span class="s">'admin'</span>, <span class="s">'coordinator'</span>]); }</pre>
+  </section>
+
+  <section aria-labelledby="h-d">
+    <h2 class="sec" id="h-d">Design decisions worth explaining</h2>
+    <div class="dec">
+      <div class="card"><span class="n">1</span><div><h3>Two emails per person</h3><p class="small muted">Districts often put staff mail on one system and Google Workspace on a second domain, and Google sign-in presents the second one. So both domain types live in the seed, and every automatic email goes to the member's "best contact" address first. When someone says they never got the email, that's the first thing to check.</p></div></div>
+      <div class="card"><span class="n">2</span><div><h3>Track is recomputed at render time</h3><p class="small muted">A track stamped at sign-up goes stale when a domain is added later. Recomputing from the email means district staff never sit in the guest queue forever. They show up with a "reclassified" pill, and approving them writes the corrected track.</p></div></div>
+      <div class="card"><span class="n">3</span><div><h3>The system learns, carefully</h3><p class="small muted">Approving a self-declared applicant teaches their domain, so the next colleague is auto-verified. Gmail and other personal providers can never be learned, and partner or guest trust is never applied to a whole domain. Recategorizing a domain never touches active members.</p></div></div>
+      <div class="card"><span class="n">4</span><div><h3>XP without counters</h3><p class="small muted">Level is the count of ledger docs, computed from the ledger and never from a cached field the member could write. That leaves no drift, no race conditions, and no replays.</p></div></div>
+      <div class="card"><span class="n">5</span><div><h3>Public topics, gated logistics</h3><p class="small muted">Topics are the reason people register, so everyone sees them. Times, rooms, and calendar invites unlock after approval, and approved guests unlock only their one meeting.</p></div></div>
+      <div class="card"><span class="n">6</span><div><h3>Built for a three-person team</h3><p class="small muted">Approvals, meetings, room codes, and exports all happen in the admin UI, so co-admins can run the network without touching code or git.</p></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-x">
+    <h2 class="sec" id="h-x">About this demo</h2>
+    <p class="muted">A portfolio rebuild. Everything runs in your browser, with localStorage standing in for Firestore and the rules simulated in JavaScript. Every person, district, and session is invented, and institutional domains use the reserved <code>.example</code> suffix. Use "Reset demo" in the footer to start over.</p>
+    <div class="row" style="margin-top:14px"><a class="btn" href="join.html">Try the join flow</a><a class="btn ghost" href="https://github.com/wkriesel/ai-forward-network">View source</a></div>
+  </section>
+</main>
+<script>APP.shell();</script>
+</body>
+</html>

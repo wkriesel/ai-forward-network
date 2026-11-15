@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Forward Network · Demo</title>
+<meta name="description" content="Demo of a year-round educator AI network and summit platform: domain-verified waitlist, gated meetings, XP ladder, and an event app. All data invented.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23E8813A%22/%3E%3Ctext x=%2216%22 y=%2221%22 font-size=%2213%22 font-family=%22Arial%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script src="data.js"></script>
+<script src="app.js"></script>
+<style>
+.next{display:grid;gap:18px;grid-template-columns:1fr;align-items:center}
+@media(min-width:820px){.next{grid-template-columns:1.3fr 1fr}}
+.date-chip{display:inline-block;background:var(--orange);color:#fff;font-weight:700;border-radius:8px;padding:4px 10px;font-size:14px}
+.prog{list-style:none;display:grid;gap:10px}
+.prog li{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:baseline;background:var(--white);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.prog .d{font-weight:700;color:var(--orange-dk);font-size:14px}
+.prog .t{font-family:var(--f-head);font-weight:600;color:var(--navy)}
+@media(max-width:520px){.prog li{grid-template-columns:1fr;gap:2px}}
+</style>
+</head>
+<body>
+<header class="hero"><div class="hero-in">
+  <p class="kicker">Year-round network &middot; 28 districts</p>
+  <h1>Educators building with AI, together, all year.</h1>
+  <p>Monthly meetings, a member community, a webinar series, and an annual summit. Free for educators in the county's public districts and charter schools.</p>
+  <div class="row" style="margin-top:22px"><a class="btn" href="join.html">Join the '26-27 network</a><a class="btn light" href="meetings.html">See the meetings</a></div>
+</div></header>
+<main>
+  <section aria-labelledby="h-next">
+    <div class="card next" id="next"></div>
+  </section>
+
+  <section aria-labelledby="h-stats">
+    <h2 class="sec" id="h-stats">The network at a glance</h2>
+    <p class="lede">Live from the demo data. Try approving people in Admin and watch these move.</p>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section aria-labelledby="h-prog">
+    <h2 class="sec" id="h-prog">The '26-27 program</h2>
+    <p class="lede">Topics are public, because they're the reason someone registers. Times and rooms unlock after approval.</p>
+    <ul class="prog" id="prog"></ul>
+  </section>
+
+  <section aria-labelledby="h-tour">
+    <h2 class="sec" id="h-tour">Tour the platform</h2>
+    <p class="lede">One app grew from a one-day summit into a year-round network without a rewrite. Use "View as" at the top to see each audience's version.</p>
+    <div class="grid">
+      <a class="card" href="join.html" style="text-decoration:none;color:inherit"><span class="pill o">Identity</span><h3 style="margin-top:10px">Join + domain intelligence</h3><p class="muted small">Type any email and watch the system sort it: district, charter, higher ed, or the application path.</p></a>
+      <a class="card" href="admin.html" style="text-decoration:none;color:inherit"><span class="pill">Operations</span><h3 style="margin-top:10px">Waitlist that learns</h3><p class="muted small">Approve one person from a new domain and the next colleague gets auto-verified.</p></a>
+      <a class="card" href="community.html" style="text-decoration:none;color:inherit"><span class="pill s">Engagement</span><h3 style="margin-top:10px">The monthly 3-A ladder</h3><p class="muted small">Attend, Artifact, Advice. Three XP a month, enforced by document IDs, not counters.</p></a>
+      <a class="card" href="summit.html" style="text-decoration:none;color:inherit"><span class="pill o">Event</span><h3 style="margin-top:10px">Summit app</h3><p class="muted small">Schedule by strand, ticket check-in, and live Q&amp;A with voting.</p></a>
+    </div>
+  </section>
+</main>
+<script>
+APP.shell();
+const D = DEMO, { esc, isMember, applicants, $ } = APP;
+const n = D.MEETINGS[2];
+$('#next').innerHTML = `<div><p class="kicker" id="h-next">Next meeting</p><h2 style="font-size:1.6rem;margin:8px 0 6px">${esc(n.topic)}</h2>
+  <p class="muted">${esc(n.sub)}</p><p style="margin-top:12px"><span class="date-chip">${esc(n.date)}</span></p></div>
+  <div>${isMember() ? `<p><b>${esc(n.time)}</b><br>${esc(n.room)}</p><a class="btn navy sm" style="margin-top:10px" href="meetings.html">Add to calendar</a>`
+    : `<p class="lock">🔒 Time and room unlock when you're approved</p><p style="margin-top:12px"><a class="btn sm" href="join.html">Join to unlock</a></p>`}</div>`;
+const apps = applicants();
+const active = D.MEMBERS.length + apps.filter(a => a.status === 'active').length;
+$('#stats').innerHTML = [[active,'approved members'],[apps.filter(a => a.status === 'pending').length,'on the waitlist'],[D.MEETINGS.length,'meetings this year'],[D.DISTRICTS.length,'districts in the demo seed']]
+  .map(([v,l]) => `<div class="stat"><div class="n">${v}</div><div class="l">${l}</div></div>`).join('');
+$('#prog').innerHTML = D.MEETINGS.map(m => `<li><span class="d">${esc(m.date)}</span><span><span class="t">${esc(m.topic)}</span><br><span class="muted small">${esc(m.sub)}</span></span></li>`).join('');
+</script>
+</body>
+</html>

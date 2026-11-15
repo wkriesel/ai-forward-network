@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Join · AI Forward Network demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23E8813A%22/%3E%3Ctext x=%2216%22 y=%2221%22 font-size=%2213%22 font-family=%22Arial%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script src="data.js"></script>
+<script src="app.js"></script>
+<style>
+.resolver{position:sticky;top:12px}
+.res-track{font-family:var(--f-head);font-size:1.5rem;font-weight:700;color:var(--navy);margin:6px 0}
+.steps{list-style:none;display:grid;gap:8px;margin-top:12px}
+.steps li{display:grid;grid-template-columns:26px 1fr;gap:10px;font-size:14px;color:var(--muted)}
+.steps li .i{width:24px;height:24px;border-radius:50%;background:var(--sand);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--graphite)}
+.steps li.hit{color:var(--ink)} .steps li.hit .i{background:var(--orange);color:#fff}
+.try{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.try button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 10px;font:inherit;font-size:13px;color:var(--navy-2);cursor:pointer;min-height:34px}
+fieldset{border:0}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer;background:#fff}
+.opt input{margin-top:5px;width:18px;height:18px;accent-color:var(--orange)}
+.opt:has(input:checked){border-color:var(--navy);background:var(--blue-light)}
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">Register for '26-27</p>
+  <h1 class="page">Join the network</h1>
+  <p class="lede">Free for educators in the county's public districts and charter schools. <b>Everyone lands on the waitlist.</b> Nobody self-activates, on any track. The email you sign in with decides how fast staff can approve you.</p>
+
+  <div class="grid-2">
+    <form class="card" id="form" novalidate>
+      <div class="field"><label class="lbl" for="email">Sign-in email</label>
+        <input id="email" type="email" autocomplete="off" placeholder="you@yourdistrict.example" required>
+        <div class="try" aria-label="Try an example"><span class="tiny muted" style="align-self:center">Try:</span></div></div>
+      <div class="field"><label class="lbl" for="name">Full name</label><input id="name" type="text" required></div>
+      <div class="field"><label class="lbl" for="role">Role</label><input id="role" type="text" placeholder="e.g. Instructional coach"></div>
+      <div class="field"><label class="lbl" for="contact">Best email for reminders <span class="muted" style="font-weight:400">(optional)</span></label>
+        <input id="contact" type="email" placeholder="If you read mail somewhere else">
+        <p class="hint">Many districts sign you in on a Google domain but deliver mail on Outlook. Every automatic email goes here first.</p></div>
+
+      <fieldset id="bucket" hidden>
+        <legend class="lbl">We don't recognize that domain. Which best describes you?</legend>
+        <label class="opt"><input type="radio" name="b" value="k12"><span><b>County public district</b><br><span class="small muted">Staff confirm, then your colleagues get auto-verified.</span></span></label>
+        <label class="opt"><input type="radio" name="b" value="charter"><span><b>County charter school</b></span></label>
+        <label class="opt"><input type="radio" name="b" value="highered"><span><b>Higher education</b></span></label>
+        <label class="opt"><input type="radio" name="b" value="none"><span><b>None of these</b><br><span class="small muted">Apply as a guest (one meeting) or a partner (full series).</span></span></label>
+      </fieldset>
+      <div id="apply" hidden>
+        <div class="field"><label class="lbl" for="want">What are you asking for?</label>
+          <select id="want"><option value="guest">One meeting as a guest</option><option value="partner">The full series as a partner</option></select></div>
+        <div class="field"><label class="lbl" for="reason">Why do you want to come? <span class="bad" style="color:var(--red)">*</span></label><textarea id="reason"></textarea>
+          <p class="hint">Partners are organizations that give more than they take. Vendors stay on the one-meeting guest path.</p></div>
+      </div>
+      <p class="small" id="err" role="alert" style="color:var(--red);min-height:1.2em"></p>
+      <button class="btn" type="submit">Join the waitlist</button>
+    </form>
+
+    <aside class="card resolver" aria-live="polite" aria-labelledby="h-res">
+      <p class="kicker" id="h-res">How the system reads your email</p>
+      <div id="res"><p class="muted" style="margin-top:8px">Start typing an email.</p></div>
+    </aside>
+  </div>
+</main>
+<script>
+APP.shell();
+const D = DEMO, { $, esc, resolve, store, toast } = APP;
+const EX = ['dwhitfield@harborusd.example','m.lee@mvstudents.example','teacher@gmail.com','prof@stateuniversity.edu','tbecker@juniperusd.example','someone@cedar.k12.example'];
+$('.try').insertAdjacentHTML('beforeend', EX.map(e => `<button type="button" data-ex="${e}">${e.split('@')[1]}</button>`).join(''));
+$('.try').addEventListener('click', e => { const b = e.target.closest('[data-ex]'); if (!b) return; $('#email').value = b.dataset.ex; update(); });
+
+function update(){
+  const r = resolve($('#email').value);
+  const verified = !!r.track;
+  $('#bucket').hidden = !r.domain || verified;
+  const none = !verified && document.querySelector('input[name=b]:checked')?.value === 'none';
+  $('#apply').hidden = !none;
+  if (!r.domain) { $('#res').innerHTML = `<p class="muted" style="margin-top:8px">Start typing an email.</p>`; return; }
+  const steps = [
+    ['Personal mail?', r.personal], ['Learned from a past approval?', r.layer === 'learned'],
+    ['In the reviewed seed list?', r.layer === 'seed'], ['Matches a rule (*.k12, .edu)?', r.layer === 'rule']];
+  $('#res').innerHTML = `<p class="small muted" style="margin-top:8px">Domain <code>${esc(r.domain)}</code></p>
+    <div class="res-track">${verified ? esc(D.TRACK[r.track]) : r.personal ? 'Not verifiable' : 'Application path'}</div>
+    ${verified ? `<span class="pill s">✓ Domain-verified: staff can bulk-approve</span>` : `<span class="pill o">Reviewed one by one</span>`}
+    ${r.org ? `<p class="small" style="margin-top:8px">Matched: <b>${esc(r.org)}</b></p>` : ''}
+    <ol class="steps">${steps.map(([l,h]) => `<li class="${h?'hit':''}"><span class="i">${h?'✓':'·'}</span><span>${l}</span></li>`).join('')}</ol>
+    <p class="note ${verified ? 's' : r.personal ? 'r' : 'o'}" style="margin-top:12px">${esc(r.why)}</p>`;
+}
+$('#email').addEventListener('input', update);
+document.addEventListener('change', e => { if (e.target.name === 'b') update(); });
+
+$('#form').addEventListener('submit', e => {
+  e.preventDefault();
+  const email = $('#email').value.trim(), name = $('#name').value.trim(), r = resolve(email);
+  const b = document.querySelector('input[name=b]:checked')?.value;
+  const err = m => { $('#err').textContent = m; };
+  if (!r.domain) return err('Enter your sign-in email.');
+  if (!name) return err('Add your name.');
+  if (!r.track && !b) return err('Pick which best describes you.');
+  if (b === 'none' && !$('#reason').value.trim()) return err('Guests and partners need a reason.');
+  const app = { id:'x' + Date.now(), name, email, role:$('#role').value.trim() || 'Educator', applied:'Today', contact:$('#contact').value.trim() || undefined };
+  if (!r.track) { app.declared = b === 'none' ? $('#want').value : b; if (b === 'none') app.reason = $('#reason').value.trim(); }
+  store.set('extra', store.get('extra', []).concat(app)); store.set('role', 'pending');
+  $('#form').innerHTML = `<p class="kicker">You're on the waitlist</p><h2 style="margin:8px 0">Thanks, ${esc(name.split(' ')[0])}.</h2>
+    <p class="muted">A confirmation went to <b>${esc(app.contact || email)}</b>. ${r.track ? 'Your domain is verified, so approval is usually quick.' : 'Staff will review your request individually.'}</p>
+    <div class="row" style="margin-top:16px"><a class="btn navy" href="admin.html">See it from the staff side</a><a class="btn ghost" href="meetings.html">Meetings</a></div>
+    <p class="tiny muted" style="margin-top:12px">You're now viewing the site as Waitlisted. Times and rooms stay locked until staff approve you.</p>`;
+  $('#viewas').value = 'pending'; toast('Added to the demo waitlist.');
+});
+update();
+</script>
+</body>
+</html>

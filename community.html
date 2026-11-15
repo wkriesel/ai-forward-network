@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community · AI Forward Network demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23E8813A%22/%3E%3Ctext x=%2216%22 y=%2221%22 font-size=%2213%22 font-family=%22Arial%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script src="data.js"></script>
+<script src="app.js"></script>
+<style>
+.me{display:grid;gap:18px;grid-template-columns:auto 1fr;align-items:center}
+.badge svg{width:84px;height:84px;image-rendering:pixelated;display:block}
+.ladder{display:grid;grid-template-columns:repeat(18,1fr);gap:3px;margin-top:12px}
+.ladder span{height:14px;border-radius:3px;background:var(--sand)}
+.three{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.vec{border-top:5px solid var(--c)}
+.vec.done{background:var(--sage-light)}
+.docid{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--cloud);border:1px solid var(--line);border-radius:6px;padding:4px 8px;display:inline-block;margin-top:8px;word-break:break-all}
+.post{display:grid;grid-template-columns:42px 1fr;gap:12px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.kudo{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 12px;min-height:36px;font:inherit;font-size:14px;cursor:pointer;color:var(--navy)}
+.kudo[aria-pressed=true]{background:var(--orange-light);border-color:var(--orange);color:var(--orange-dk)}
+.feed{display:grid;gap:12px}
+.tiers{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.tiers .card{text-align:center;padding:14px}
+.tiers svg{width:48px;height:48px;image-rendering:pixelated}
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">Members</p>
+  <h1 class="page">Community</h1>
+  <p class="lede">Wins, artifacts, and advice from members, plus a ladder that rewards showing up and sharing. The ladder runs on the monthly 3-A engine: up to one XP each for <b>Attend</b>, <b>Artifact</b>, and <b>Advice</b>, every calendar month.</p>
+  <div id="gate"></div>
+  <div id="body"></div>
+</main>
+<script>
+APP.shell();
+const D = DEMO, { $, esc, isMember, store, toast } = APP;
+
+/* 8x8 pixel icons, one per tier. Badges are inline SVG: no image assets. */
+const ICONS = {
+  crawl:['..####..','.######.','########','########','########','########','.######.','..####..'],
+  walk: ['........','.....##.','....###.','###.##..','########','########','#######.','........'],
+  run:  ['....###.','...###..','..###...','.######.','...###..','..###...','.###....','###.....'],
+  swim: ['........','.##..##.','#..##..#','........','.##..##.','#..##..#','........','........'],
+  sprint:['#......#','##....##','###..###','########','.######.','..####..','...##...','........'],
+  fly:  ['#..##..#','########','########','.######.','.#.##.#.','.######.','........','........']
+};
+function badge(level){
+  const lv = Math.max(1, Math.min(18, level)), tier = D.TIERS[Math.floor((lv - 1) / 3)], c = tier.colors[(lv - 1) % 3];
+  const px = ICONS[tier.key].map((row, y) => [...row].map((ch, x) => ch === '#' ? `<rect x="${x+1}" y="${y+1}" width="1" height="1" fill="${c}"/>` : '').join('')).join('');
+  return `<svg viewBox="0 0 10 10" role="img" aria-label="Level ${lv} ${tier.name} badge" shape-rendering="crispEdges"><rect x="0" y="0" width="10" height="10" rx="1.5" fill="#fff" stroke="${c}" stroke-width=".5"/>${px}</svg>`;
+}
+
+const ledger = () => store.get('ledger', D.LEDGER_SEED);
+const uid = D.ME.id, M = D.THIS_MONTH;
+
+function award(vector){
+  const id = M + '_' + vector, L = ledger();
+  if (L.includes(id)) return { ok:false, id };
+  store.set('ledger', L.concat(id)); return { ok:true, id };
+}
+
+if (!isMember()) {
+  $('#gate').innerHTML = `<div class="card" style="max-width:620px"><h2 class="sec">Members only</h2><p class="muted" style="margin:6px 0 14px">The feed, directory, and ladder open after staff approve you. Rules enforce it on the server, not just the page.</p>
+    <div class="row"><a class="btn" href="join.html">Join</a><button class="btn navy" id="asMember">View as Member</button></div></div>
+    <section><h2 class="sec">The 18-level ladder</h2><p class="lede">Six tiers, three levels each. The same 8-bit badges for members and staff.</p><div class="tiers" id="tiers"></div></section>`;
+  $('#asMember').addEventListener('click', () => { store.set('role','member'); location.reload(); });
+  $('#tiers').innerHTML = D.TIERS.map((t,i) => `<div class="card">${badge(i*3+1)}<h3 style="margin-top:6px">${esc(t.name)}</h3><p class="tiny muted">Levels ${i*3+1}-${i*3+3} &middot; ${esc(t.title)}</p></div>`).join('');
+} else {
+  render();
+}
+
+function render(){
+  const L = ledger(), xp = L.length, level = Math.min(18, Math.max(1, xp)), tier = D.TIERS[Math.floor((level - 1) / 3)];
+  const V = [['attend','Attend','Check in at the monthly meeting with the room code.','var(--navy)'],
+             ['artifact','Artifact','Share something you built.','var(--orange)'],
+             ['advice','Advice','Post advice or answer the monthly survey.','var(--sage-dk)']];
+  $('#body').innerHTML = `
+  <section class="card me" aria-label="Your level">
+    <div class="badge">${badge(level)}</div>
+    <div><p class="kicker">Viewing as ${esc(D.ME.name)}</p><h2 style="margin:4px 0">Level ${level} &middot; ${esc(tier.name)}</h2>
+      <p class="muted small">${esc(tier.title)} &middot; ${xp} XP total. Level is just the count of ledger docs, so it can never disagree with the evidence.</p>
+      <div class="ladder" aria-hidden="true">${Array.from({length:18}, (_,i) => `<span style="background:${i < level ? D.TIERS[Math.floor(i/3)].colors[i%3] : ''}"></span>`).join('')}</div></div>
+  </section>
+  <section aria-labelledby="h-3a">
+    <h2 class="sec" id="h-3a">${esc(D.THIS_MONTH_LABEL)}'s 3-A</h2>
+    <p class="lede">Each award is a document with a predictable ID. Try earning one twice: the second write targets a doc that already exists, and the rules allow create but deny update. No counters to drift, no races, no replays.</p>
+    <div class="three">${V.map(([k,l,d,c]) => { const id = M + '_' + k, has = L.includes(id);
+      return `<div class="card vec ${has ? 'done' : ''}" style="--c:${c}"><h3>${l}</h3><p class="muted small">${d}</p>
+        <span class="docid">xpLedger/${uid}_${id}</span>
+        <div class="row" style="margin-top:10px">${k === 'attend' && !has ? `<a class="btn sm navy" href="meetings.html">Check in at meetings</a>` : `<button class="btn sm ${has ? 'ghost' : ''}" data-award="${k}">${has ? 'Try to earn it again' : 'Earn +1 ' + l.toUpperCase()}</button>`}</div>
+        <p class="small" id="msg-${k}" style="margin-top:8px">${has ? '✓ Earned this month' : ''}</p></div>`; }).join('')}</div>
+  </section>
+  <section aria-labelledby="h-feed">
+    <h2 class="sec" id="h-feed">Feed</h2>
+    <form class="card" id="newpost" style="margin:10px 0 14px"><label class="lbl" for="ptext">Share a win or an artifact</label>
+      <textarea id="ptext" placeholder="What did you build or try this month?"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn sm">Post</button><span class="tiny muted">Posting an artifact earns this month's ARTIFACT XP, once.</span></div></form>
+    <div class="feed" id="feed"></div>
+  </section>`;
+  renderFeed();
+}
+
+function renderFeed(){
+  const kudos = store.get('kudos', {}), posts = store.get('posts', []).concat(D.FEED);
+  $('#feed').innerHTML = posts.map((p,i) => { const k = p.who + p.when, on = !!kudos[k];
+    return `<article class="card post"><span class="av" aria-hidden="true">${esc(p.who.split(' ').map(x=>x[0]).join(''))}</span>
+      <div><p><b>${esc(p.who)}</b> <span class="muted small">&middot; ${esc(p.role)} &middot; ${esc(p.when)}</span> <span class="pill ${p.kind==='Artifact'?'o':p.kind==='Advice'?'s':''}">${esc(p.kind)}</span></p>
+      <p style="margin:6px 0 10px">${esc(p.text)}</p>
+      <button class="kudo" data-kudo="${esc(k)}" aria-pressed="${on}">👏 Kudos ${p.kudos + (on ? 1 : 0)}</button></div></article>`; }).join('');
+}
+
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-award]');
+  if (a) { const k = a.dataset.award, r = award(k);
+    if (r.ok) { render(); toast('+1 ' + k.toUpperCase() + ' XP'); }
+    else { const m = $('#msg-' + k); m.innerHTML = `<span style="color:var(--red)">✕ Denied. <code>${uid}_${r.id}</code> already exists, and the rules allow create, never update.</span>`; } }
+  const kd = e.target.closest('[data-kudo]');
+  if (kd) { const ks = store.get('kudos', {}); ks[kd.dataset.kudo] = !ks[kd.dataset.kudo]; store.set('kudos', ks); renderFeed(); }
+});
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'newpost') return; e.preventDefault();
+  const t = $('#ptext').value.trim(); if (!t) { toast('Write something first.'); return; }
+  store.set('posts', [{ who:D.ME.name, role:'Math teacher', when:'now', kind:'Artifact', text:t, kudos:0 }].concat(store.get('posts', [])));
+  const r = award('artifact'); render(); toast(r.ok ? 'Posted. +1 ARTIFACT XP' : 'Posted. ARTIFACT XP already earned this month.');
+});
+</script>
+</body>
+</html>

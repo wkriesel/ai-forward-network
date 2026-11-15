@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin · AI Forward Network demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23E8813A%22/%3E%3Ctext x=%2216%22 y=%2221%22 font-size=%2213%22 font-family=%22Arial%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script src="data.js"></script>
+<script src="app.js"></script>
+<style>
+.grp{margin-top:22px}
+.grp-h{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.grp-h h3{font-size:1.15rem}
+.app{display:grid;gap:10px;grid-template-columns:1fr;align-items:center}
+@media(min-width:760px){.app{grid-template-columns:1fr auto}}
+.app .em{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--muted);word-break:break-all}
+.apps{display:grid;gap:10px}
+.empty{color:var(--muted);font-size:14px;padding:12px;border:1px dashed var(--line);border-radius:10px}
+select.sm{min-height:36px;width:auto;max-width:150px;font-size:14px;padding:4px 8px}
+#learned td{padding:8px}
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">Staff dashboard</p>
+  <h1 class="page">Network members '26-27</h1>
+  <p class="lede">The daily path for a small team: clear the waitlist, keep the domain list honest, export the roster. Approving someone unlocks meeting times, the directory, and the feed, and sends the welcome email.</p>
+  <div class="stats" id="stats"></div>
+
+  <section aria-labelledby="h-w">
+    <h2 class="sec" id="h-w" style="margin-top:34px">Waitlist</h2>
+    <p class="lede">Domain-verified applicants sort to the top so review never becomes the bottleneck. Guests and partners are always reviewed one by one.</p>
+    <div id="learnNote"></div>
+    <div id="wait"></div>
+  </section>
+
+  <section aria-labelledby="h-d">
+    <h2 class="sec" id="h-d">Domain intelligence</h2>
+    <p class="lede">Two layers: a reviewed seed list in code, and domains learned from staff approvals, stored as data. Learned beats seed, including demotions. Personal mail is never learnable, and partner or guest trust is never applied domain-wide.</p>
+    <div class="grid-2">
+      <div><h3 style="font-size:1.05rem;margin-bottom:8px">Learned domains</h3><div class="tbl-wrap"><table><thead><tr><th scope="col">Domain</th><th scope="col">Track</th><th scope="col"></th></tr></thead><tbody id="learned"></tbody></table></div></div>
+      <div><h3 style="font-size:1.05rem;margin-bottom:8px">Unrecognized domains on the waitlist</h3><div class="card" id="unknown"></div>
+        <p class="tiny muted" style="margin-top:8px">The fastest way to spot a district whose Google domain is missing from the seed.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-r">
+    <div class="grp-h"><h2 class="sec" id="h-r">Approved roster</h2><button class="btn navy sm" id="csv">Export CSV</button></div>
+    <div class="tbl-wrap"><table><thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Track</th><th scope="col">Contact</th></tr></thead><tbody id="roster"></tbody></table></div>
+  </section>
+</main>
+<script>
+if (APP.shell({ staffOnly:true })) {
+  const D = DEMO, { $, esc, store, toast, resolve, applicants, setApp, download } = APP;
+  const TL = D.TRACK;
+
+  function classify(a){
+    const r = resolve(a.email);
+    if (r.track) return { group:'verified', track:r.track, r, reclass: a.stamped && a.stamped !== r.track ? a.stamped : null };
+    if (a.declared === 'guest' || a.declared === 'partner') return { group:'apply', track:a.declared, r };
+    return { group:'declared', track:a.declared, r };
+  }
+  function card(a, c){
+    const contact = a.contact ? `<span class="small">✉️ ${esc(a.contact)}</span>` : '';
+    const pills = [`<span class="pill ${c.group === 'verified' ? 's' : 'o'}">${esc(TL[c.track] || 'Unknown')}</span>`];
+    if (c.reclass) pills.push(`<span class="pill">↺ reclassified from ${esc(TL[c.reclass])}</span>`);
+    if (c.r.personal) pills.push(`<span class="pill r">Personal mail: won't teach the domain</span>`);
+    const actions = c.group === 'apply'
+      ? `<button class="btn sm sage" data-ok="${a.id}">${c.track === 'partner' ? 'Grant partner' : 'Approve for ' + esc(a.meeting || 'one meeting')}</button><button class="btn sm danger" data-no="${a.id}">Decline</button>`
+      : `<button class="btn sm sage" data-ok="${a.id}">Approve</button><button class="btn sm danger" data-no="${a.id}">Deny</button>`;
+    return `<article class="card app"><div><p><b>${esc(a.name)}</b> <span class="muted small">&middot; ${esc(a.role)} &middot; applied ${esc(a.applied)}</span></p>
+      <p class="em">${esc(a.email)}</p><div class="row" style="margin-top:6px">${pills.join('')}${contact}</div>
+      ${a.reason ? `<p class="small" style="margin-top:6px">“${esc(a.reason)}”</p>` : ''}</div>
+      <div class="row">${actions}</div></article>`;
+  }
+  function render(){
+    const all = applicants(), pend = all.filter(a => a.status === 'pending').map(a => [a, classify(a)]);
+    const G = { verified:[], declared:[], apply:[] }; pend.forEach(([a,c]) => G[c.group].push([a,c]));
+    const approved = D.MEMBERS.length + all.filter(a => a.status === 'active').length;
+    $('#stats').innerHTML = [[approved,'approved members'],[pend.length,'waitlist'],[G.verified.length,'domain-verified'],[Object.keys(store.get('learned',{})).length,'learned domains']]
+      .map(([v,l]) => `<div class="stat"><div class="n">${v}</div><div class="l">${l}</div></div>`).join('');
+    const sec = (title, sub, list, extra) => `<div class="grp"><div class="grp-h"><div><h3>${title} <span class="pill g">${list.length}</span></h3><p class="small muted">${sub}</p></div>${extra || ''}</div>
+      <div class="apps">${list.length ? list.map(([a,c]) => card(a,c)).join('') : '<p class="empty">Nothing waiting here.</p>'}</div></div>`;
+    $('#wait').innerHTML =
+      sec('Domain-verified', 'Their email domain resolves to a district, charter, or college.', G.verified,
+        G.verified.length ? `<button class="btn" id="bulk">Approve all ${G.verified.length} domain-verified</button>` : '') +
+      sec('Self-declared', 'Unknown domain, picked a school bucket. Approving teaches the system that domain.', G.declared) +
+      sec('Guest & partner applications', 'Never bulk-approved. Trust is per person, never per company.', G.apply);
+    const L = store.get('learned', {});
+    $('#learned').innerHTML = Object.keys(L).length ? Object.entries(L).map(([d,v]) => `<tr><td><code>${esc(d)}</code></td>
+      <td><select class="sm" data-recat="${esc(d)}" aria-label="Track for ${esc(d)}">${['k12','charter','highered','guest'].map(t => `<option value="${t}"${t===v.track?' selected':''}>${esc(TL[t])}</option>`).join('')}</select></td>
+      <td><button class="btn sm ghost" data-forget="${esc(d)}">Forget</button></td></tr>`).join('')
+      : `<tr><td colspan="3" class="muted small">Nothing learned yet. Approve <b>Tom Becker</b> below the verified group and watch his colleague <b>Lena Park</b> move up.</td></tr>`;
+    const unk = [...new Set(pend.filter(([a,c]) => !c.r.track && !c.r.personal && c.group === 'declared').map(([a,c]) => c.r.domain))];
+    $('#unknown').innerHTML = unk.length ? unk.map(d => `<p><code>${esc(d)}</code> <span class="small muted">&middot; ${pend.filter(([a,c]) => c.r.domain === d).length} waiting</span></p>`).join('') : '<p class="muted small">None. Every waiting domain is recognized.</p>';
+    const rows = D.MEMBERS.map(m => ({ name:m.name, role:m.role, track:m.track, contact:m.email }))
+      .concat(all.filter(a => a.status === 'active').map(a => ({ name:a.name, role:a.role, track:a.track || classify(a).track, contact:a.contact || a.email })));
+    $('#roster').innerHTML = rows.map(r => `<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.role)}</td><td><span class="pill ${r.track==='partner'?'o':'s'}">${esc(TL[r.track] || r.track)}</span></td><td class="small">${esc(r.contact)}</td></tr>`).join('');
+    window.__rows = rows;
+  }
+  function approve(id){
+    const a = applicants().find(x => x.id === id), c = classify(a);
+    setApp(id, { status:'active', track:c.track });
+    if (c.group === 'declared' && !c.r.personal && ['k12','charter','highered'].includes(c.track)) {
+      const L = store.get('learned', {}); L[c.r.domain] = { track:c.track, org:'Learned from approving ' + a.name }; store.set('learned', L);
+      $('#learnNote').innerHTML = `<p class="note s" style="margin-bottom:8px"><b>Learned ${esc(c.r.domain)} as ${esc(TL[c.track])}.</b> Anyone else from that domain is now domain-verified.</p>`;
+    } else $('#learnNote').innerHTML = '';
+    toast('Approved. Welcome email sent to ' + (a.contact || a.email) + '.');
+  }
+  document.addEventListener('click', e => {
+    const ok = e.target.closest('[data-ok]'), no = e.target.closest('[data-no]'), f = e.target.closest('[data-forget]');
+    if (ok) { approve(ok.dataset.ok); render(); }
+    if (no) { setApp(no.dataset.no, { status:'denied' }); render(); toast('Decision email sent.'); }
+    if (e.target.id === 'bulk') { const ids = applicants().filter(a => a.status === 'pending' && classify(a).group === 'verified').map(a => a.id);
+      ids.forEach(id => setApp(id, { status:'active', track:classify(applicants().find(x => x.id === id)).track })); render(); toast('Approved ' + ids.length + ' domain-verified members.'); }
+    if (f) { const L = store.get('learned', {}); delete L[f.dataset.forget]; store.set('learned', L); render(); toast('Forgotten. Falls back to the seed.'); }
+    if (e.target.id === 'csv') { const rows = window.__rows, q = v => '"' + String(v).replace(/"/g,'""') + '"';
+      download('ai-forward-roster.csv', ['name,role,track,contact'].concat(rows.map(r => [r.name,r.role,TL[r.track]||r.track,r.contact].map(q).join(','))).join('\n'), 'text/csv'); toast('Roster CSV downloaded.'); }
+  });
+  document.addEventListener('change', e => { const s = e.target.closest('[data-recat]'); if (!s) return;
+    const L = store.get('learned', {}); L[s.dataset.recat].track = s.value; store.set('learned', L); render();
+    toast(s.value === 'guest' ? 'Demoted. That domain goes to the application path.' : 'Recategorized. The waitlist re-sorted.'); });
+  render();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Summit · AI Forward Network demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23E8813A%22/%3E%3Ctext x=%2216%22 y=%2221%22 font-size=%2213%22 font-family=%22Arial%22 font-weight=%22700%22 fill=%22white%22 text-anchor=%22middle%22%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script src="data.js"></script>
+<script src="app.js"></script>
+<style>
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px}
+.chip{border:1.5px solid var(--c);color:var(--c);background:#fff;border-radius:999px;padding:5px 12px;min-height:36px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--c);color:#fff}
+.slot{margin-bottom:18px}
+.slot h3{font-family:var(--f-body);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.sess{display:grid;gap:10px}
+.s{border-left:5px solid var(--c);display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
+.s h4{font-family:var(--f-head);color:var(--navy);font-size:1.05rem}
+.star{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:#fff;font-size:20px;cursor:pointer;color:var(--orange)}
+.star[aria-pressed=true]{background:var(--orange);color:#fff;border-color:var(--orange)}
+.kiosk{background:var(--navy);color:#fff}
+.kiosk h2,.kiosk h3{color:#fff}
+.kiosk input{font-size:22px;text-align:center;letter-spacing:.08em;text-transform:uppercase;min-height:56px}
+.namebadge{background:#fff;color:var(--ink);border-radius:12px;padding:16px;margin-top:14px;text-align:center;border-top:10px solid var(--orange)}
+.namebadge .nm{font-family:var(--f-head);font-size:1.6rem;font-weight:700;color:var(--navy)}
+.q{display:grid;grid-template-columns:56px 1fr auto;gap:12px;align-items:center}
+.vote{display:flex;flex-direction:column;align-items:center;justify-content:center;width:56px;min-height:56px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font:inherit;cursor:pointer;color:var(--navy)}
+.vote b{font-size:1.1rem}
+.vote[aria-pressed=true]{background:var(--blue-light);border-color:var(--navy)}
+.hide{border:0;background:none;color:var(--red);font:inherit;font-size:13px;cursor:pointer;min-height:36px}
+</style>
+</head>
+<body>
+<header class="hero"><div class="hero-in">
+  <p class="kicker">AI Forward Summit &middot; one day &middot; six strands</p>
+  <h1>The summit lives inside the network.</h1>
+  <p>Registration, ticketing, check-in, schedules, and live Q&amp;A started as a one-day event app. The network grew around it later, and every printed ticket and QR code kept working.</p>
+</div></header>
+<main>
+  <div class="grid-2">
+    <section aria-labelledby="h-sch">
+      <h2 class="sec" id="h-sch">Schedule</h2>
+      <p class="lede" style="margin-bottom:8px">Filter by strand. Star sessions to build your day.</p>
+      <div class="chips" id="chips" role="group" aria-label="Filter by strand"></div>
+      <div id="sched"></div>
+    </section>
+    <div style="display:grid;gap:22px">
+      <section class="card kiosk" aria-labelledby="h-k">
+        <p class="kicker" style="color:var(--orange-light)">iPad check-in kiosk</p>
+        <h2 class="sec" id="h-k" style="margin-top:4px">Scan or type a ticket</h2>
+        <p class="small" style="color:#cfdbea;margin-bottom:12px">Demo tickets: <code style="background:#2c4f78;color:#fff">AIF-4821</code> <code style="background:#2c4f78;color:#fff">AIF-1937</code> <code style="background:#2c4f78;color:#fff">AIF-7264</code></p>
+        <form id="kform" class="row" style="flex-wrap:nowrap"><label class="sr" for="tk">Ticket code</label><input id="tk" type="text" placeholder="AIF-0000" autocomplete="off"><button class="btn">Check in</button></form>
+        <div id="kres" aria-live="polite"></div>
+        <p class="tiny" style="color:#cfdbea;margin-top:12px" id="kcount"></p>
+      </section>
+      <section aria-labelledby="h-qa">
+        <h2 class="sec" id="h-qa">Live Q&amp;A: closing panel</h2>
+        <p class="lede" style="margin-bottom:10px">Ask anonymously, vote up what you want answered. Staff can hide off-topic questions.</p>
+        <form id="qform" class="card" style="margin-bottom:12px"><label class="lbl" for="qt">Your question</label><textarea id="qt" maxlength="200"></textarea><div class="row" style="margin-top:10px"><button class="btn sm">Ask</button></div></form>
+        <div id="qa" style="display:grid;gap:10px"></div>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+APP.shell();
+const D = DEMO, { $, esc, store, toast, isStaff } = APP;
+let strand = '';
+const strandOf = id => D.STRANDS.find(s => s.id === id);
+$('#chips').innerHTML = `<button class="chip" style="--c:var(--graphite)" data-st="" aria-pressed="true">All</button>` +
+  D.STRANDS.map(s => `<button class="chip" style="--c:${s.color}" data-st="${s.id}" aria-pressed="false">${esc(s.name)}</button>`).join('');
+function sched(){
+  const mine = store.get('mine', []);
+  const list = D.SESSIONS.filter(s => !strand || s.strand === strand);
+  const slots = [...new Set(list.map(s => s.t))];
+  $('#sched').innerHTML = slots.map(t => `<div class="slot"><h3>${t}${+t.split(':')[0] < 8 ? ' pm' : ' am'}</h3><div class="sess">${list.filter(s => s.t === t).map(s => { const st = strandOf(s.strand), on = mine.includes(s.id);
+    return `<article class="card s" style="--c:${st.color}"><div><span class="pill" style="background:${st.color};color:#fff">${esc(st.name)}</span><h4 style="margin-top:6px">${esc(s.title)}</h4><p class="small muted">${esc(s.who)} &middot; ${esc(s.room)}</p></div>
+      <button class="star" data-star="${s.id}" aria-pressed="${on}" aria-label="${on?'Remove from':'Add to'} my schedule: ${esc(s.title)}">${on ? '★' : '☆'}</button></article>`; }).join('')}</div></div>`).join('') || '<p class="muted">No sessions in that strand.</p>';
+}
+function kiosk(){ const c = store.get('checked', {}); $('#kcount').textContent = Object.keys(c).length + ' of ' + Object.keys(D.TICKETS).length + ' demo attendees checked in'; }
+function qa(){
+  const extra = store.get('qa', []), votes = store.get('votes', {}), hidden = store.get('qahidden', []);
+  const list = D.QA.concat(extra).filter(q => !hidden.includes(q.id)).map(q => Object.assign({}, q, { v: q.votes + (votes[q.id] ? 1 : 0) })).sort((a,b) => b.v - a.v);
+  $('#qa').innerHTML = list.map(q => `<div class="card q"><button class="vote" data-vote="${q.id}" aria-pressed="${!!votes[q.id]}" aria-label="Vote for: ${esc(q.text)}">▲<b>${q.v}</b></button><p>${esc(q.text)}</p>${isStaff() ? `<button class="hide" data-hide="${q.id}">Hide</button>` : '<span></span>'}</div>`).join('');
+}
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-st]');
+  if (c) { strand = c.dataset.st; document.querySelectorAll('[data-st]').forEach(x => x.setAttribute('aria-pressed', x === c)); sched(); }
+  const s = e.target.closest('[data-star]');
+  if (s) { const m = store.get('mine', []), id = s.dataset.star; store.set('mine', m.includes(id) ? m.filter(x => x !== id) : m.concat(id)); sched(); }
+  const v = e.target.closest('[data-vote]');
+  if (v) { const vs = store.get('votes', {}); vs[v.dataset.vote] = !vs[v.dataset.vote]; store.set('votes', vs); qa(); }
+  const h = e.target.closest('[data-hide]');
+  if (h) { store.set('qahidden', store.get('qahidden', []).concat(h.dataset.hide)); qa(); toast('Hidden from the panel view.'); }
+});
+$('#kform').addEventListener('submit', e => { e.preventDefault();
+  const code = $('#tk').value.trim().toUpperCase(), name = D.TICKETS[code], c = store.get('checked', {});
+  if (!name) { $('#kres').innerHTML = `<p class="note r" style="margin-top:12px">No ticket matches <b>${esc(code || 'that')}</b>. Send them to the help desk.</p>`; return; }
+  if (c[code]) { $('#kres').innerHTML = `<p class="note o" style="margin-top:12px"><b>${esc(name)}</b> already checked in at ${esc(c[code])}. No second badge.</p>`; return; }
+  const t = new Date().toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }); c[code] = t; store.set('checked', c);
+  $('#kres').innerHTML = `<div class="namebadge"><p class="tiny muted">Badge printing&hellip;</p><div class="nm">${esc(name)}</div><p class="small muted">AI Forward Summit &middot; ${esc(code)}</p></div>`;
+  $('#tk').value = ''; kiosk(); toast('Welcome, ' + name.split(' ')[0] + '!');
+});
+$('#qform').addEventListener('submit', e => { e.preventDefault(); const t = $('#qt').value.trim(); if (!t) return;
+  store.set('qa', store.get('qa', []).concat({ id:'u' + Date.now(), text:t, votes:0 })); $('#qt').value = ''; qa(); toast('Question added.'); });
+sched(); kiosk(); qa();
+</script>
+</body>
+</html>
